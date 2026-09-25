@@ -22,14 +22,14 @@ export function ThemeSystem() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/portfolio', { cache: 'no-store' }).then(response => response.ok ? response.json() : null).then(data => setWallpapers((data?.wallpapers ?? []).filter((wallpaper: Wallpaper) => wallpaper.active))).catch(() => {});
+    fetch('/api/portfolio', { cache: 'no-store' }).then(response => response.ok ? response.json() : null).then(data => setWallpapers((data?.wallpapers ?? []).filter((wallpaper: Wallpaper) => wallpaper.active))).catch(() => { });
   }, []);
 
   const backgroundImage = theme.mode === 'custom' && theme.wallpaperUrl ? `linear-gradient(rgba(7,9,15,${theme.overlay}), rgba(7,9,15,${theme.overlay})), url(${theme.wallpaperUrl})` : undefined;
   return <>
     <div className={`site-background site-background-${theme.mode}`} style={backgroundImage ? { backgroundImage } : undefined} aria-hidden="true" />
     <div className="theme-control">
-      <button className="theme-trigger" type="button" onClick={() => setOpen(value => !value)} aria-label="Change background theme"><Palette size={17} /> Theme</button>
+      <button className="theme-trigger" type="button" onClick={() => setOpen(value => !value)} aria-label="Change background theme"><Palette size={17} /></button>
       {open && <div className="theme-menu">
         <div className="theme-menu-header"><strong>Choose a mood</strong><button type="button" onClick={() => setOpen(false)} aria-label="Close theme menu"><X size={15} /></button></div>
         {themes.map(item => <button className={`theme-option ${theme.mode === item.mode ? 'selected' : ''}`} type="button" key={item.mode} onClick={() => dispatch(setThemeMode(item.mode))}><span className={`theme-swatch ${item.className}`} /> <span>{item.label}</span></button>)}

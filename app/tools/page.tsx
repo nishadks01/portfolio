@@ -5,5 +5,5 @@ export const revalidate = 60;
 
 export default async function ToolsPage() {
   const data = await getPortfolioData();
-  return <ToolsShowcase tools={data.tools.filter(tool => tool.active)} features={data.toolFeatures} />;
+  return <ToolsShowcase tools={data.tools.filter(tool => tool.active)} features={data.toolFeatures}  avatarUrl={data.profile.avatar_url}/>;
 }

@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/store/provider';
 import { setSessionUser } from '@/lib/store/auth-slice';
 import { clearAssistantHistory } from '@/lib/store/assistant-slice';
 import { AdminAssistant } from './admin-assistant';
+import { AdminProfileMenu } from '../portfolio/admin-profile-menu';
 import type { ContactMessage, Education, Experience, PortfolioData, Project, ProjectVideo, Skill, Tool, ToolFeature, Wallpaper } from '@/lib/types';
 
 type EditableKey = 'skills' | 'experiences' | 'projects' | 'education';
@@ -64,6 +65,10 @@ export function AdminDashboard() {
   const [wallpaperStatus, setWallpaperStatus] = useState('');
   const [wallpaperUploading, setWallpaperUploading] = useState(false);
   const [wallpaperProgress, setWallpaperProgress] = useState(0);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [profileStatus, setProfileStatus] = useState('');
+  const [profileUploading, setProfileUploading] = useState(false);
+  const [profileProgress, setProfileProgress] = useState(0);
   const featureToolSelectRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
@@ -287,6 +292,58 @@ export function AdminDashboard() {
     if (input) input.value = '';
   }
 
+  async function uploadProfilePicture() {
+    if (!data || !profileFile) { setProfileStatus('Choose a profile picture first.'); return; }
+    if (!data.profile.id) { setProfileStatus('The profile record has no database ID. Run the Supabase schema and seed, then reload.'); return; }
+    if (!profileFile.type.startsWith('image/')) { setProfileStatus('Please select an image file.'); return; }
+    if (profileFile.size > 10 * 1024 * 1024) { setProfileStatus('Profile pictures must be 10 MB or smaller.'); return; }
+
+    setProfileUploading(true);
+    setProfileProgress(0);
+    setProfileStatus('Uploading profile picture… 0%');
+    const supabase = createClient();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session?.access_token || !user?.id) {
+      setProfileStatus(sessionError?.message ?? 'Your admin session has expired. Sign in again.');
+      setProfileUploading(false);
+      return;
+    }
+
+    const safeName = profileFile.name.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+    const storagePath = `${user.id}/${crypto.randomUUID()}-${safeName}`;
+    try {
+      await uploadStorageFile('profile-pictures', profileFile, storagePath, session.access_token, percentage => {
+        setProfileProgress(percentage);
+        setProfileStatus(`Uploading profile picture… ${percentage}%`);
+      });
+    } catch (error) {
+      setProfileStatus(error instanceof Error ? error.message : 'Profile picture upload failed.');
+      setProfileUploading(false);
+      return;
+    }
+
+    const { data: publicUrl } = supabase.storage.from('profile-pictures').getPublicUrl(storagePath);
+    const response = await fetch('/api/admin/profile/avatar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: data.profile.id, avatar_url: publicUrl.publicUrl })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      await supabase.storage.from('profile-pictures').remove([storagePath]);
+      setProfileStatus(result.error ?? 'Profile picture uploaded, but could not be saved to the database.');
+      setProfileUploading(false);
+      return;
+    }
+
+    setData({ ...data, profile: { ...data.profile, avatar_url: result.profile?.avatar_url ?? publicUrl.publicUrl } });
+    setProfileFile(null);
+    setProfileStatus('Profile picture saved successfully.');
+    setProfileUploading(false);
+    const input = document.getElementById('profile-picture-file') as HTMLInputElement | null;
+    if (input) input.value = '';
+  }
+
   async function deleteWallpaper(wallpaper: Wallpaper) {
     if (!wallpaper.id || !window.confirm(`Delete “${wallpaper.name}”?`)) return;
     const response = await fetch(`/api/admin/wallpapers/${wallpaper.id}`, { method: 'DELETE' });
@@ -300,7 +357,7 @@ export function AdminDashboard() {
   return <main className="admin-page page-shell">
     <div className="noise" />
     <div className="container">
-      <div className="admin-top"><div><a className="brand" href="/">N<span>.</span></a><div className="mini-label" style={{ marginTop: 8 }}>Content workspace</div></div><div style={{ display: 'flex', gap: 10 }}><a className="btn" href="/">View site</a><button className="btn" onClick={logout}>Sign out</button></div></div>
+      <div className="admin-top"><div><a className="brand" href="/">N<span>.</span></a><div className="mini-label" style={{ marginTop: 8 }}>Content workspace</div></div><div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><a className="btn" href="/">View site</a><AdminProfileMenu avatarUrl={data.profile.avatar_url} onSignOut={logout} /></div></div>
       <div className="admin-layout">
         <aside className="glass-card admin-sidebar">{['assistant', 'overview', 'profile', 'skills', 'experience', 'projects', 'videos', 'tools', 'wallpapers', 'education', 'messages'].map(item => <button key={item} className={`admin-tab ${tab === item ? 'active' : ''}`} onClick={() => setTab(item)}>{item[0].toUpperCase() + item.slice(1)}{item === 'messages' && messages.some(m => !m.is_read) ? ' •' : ''}</button>)}</aside>
         <section className="glass-card admin-content">
@@ -310,7 +367,7 @@ export function AdminDashboard() {
 
           {tab === 'overview' && <div className="grid grid-3"><div className="glass-card card"><div className="eyebrow">Projects</div><h2 style={{ marginTop: 15 }}>{data.projects.length}</h2></div><div className="glass-card card"><div className="eyebrow">Skills</div><h2 style={{ marginTop: 15 }}>{data.skills.length}</h2></div><div className="glass-card card"><div className="eyebrow">Unread messages</div><h2 style={{ marginTop: 15 }}>{messages.filter(m => !m.is_read).length}</h2></div></div>}
 
-          {tab === 'profile' && <div className="admin-form"><div className="row"><div className="field"><label>Name</label><input value={data.profile.full_name} onChange={e => updateProfile('full_name', e.target.value)} /></div><div className="field"><label>Role</label><input value={data.profile.role} onChange={e => updateProfile('role', e.target.value)} /></div></div><div className="field"><label>Headline</label><input value={data.profile.headline} onChange={e => updateProfile('headline', e.target.value)} /></div><div className="field"><label>Bio</label><textarea value={data.profile.bio} onChange={e => updateProfile('bio', e.target.value)} /></div><div className="row"><div className="field"><label>Email</label><input value={data.profile.email} onChange={e => updateProfile('email', e.target.value)} /></div><div className="field"><label>Phone</label><input value={data.profile.phone} onChange={e => updateProfile('phone', e.target.value)} /></div></div><div className="row"><div className="field"><label>Location</label><input value={data.profile.location} onChange={e => updateProfile('location', e.target.value)} /></div><div className="field"><label>LinkedIn URL</label><input value={data.profile.linkedin_url ?? ''} onChange={e => updateProfile('linkedin_url', e.target.value)} /></div></div><div className="field"><label>GitHub URL</label><input value={data.profile.github_url ?? ''} onChange={e => updateProfile('github_url', e.target.value)} /></div></div>}
+          {tab === 'profile' && <div className="admin-form"><div className="profile-picture-editor"><div className="profile-picture-preview">{data.profile.avatar_url ? <img src={data.profile.avatar_url} alt="Current profile" /> : <span>{data.profile.full_name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase()}</span>}</div><div className="profile-picture-fields"><div className="field"><label htmlFor="profile-picture-file">Profile picture</label><input id="profile-picture-file" type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={e => setProfileFile(e.target.files?.[0] ?? null)} /></div><p className="mini-label">JPG, PNG, WebP, or AVIF · maximum 10 MB</p>{profileStatus && <p className={profileStatus.includes('uploaded') ? 'form-status' : 'error'}>{profileStatus}</p>}{profileUploading && <div className="upload-progress" aria-label={`Profile picture upload progress ${profileProgress}%`}><span style={{ width: `${profileProgress}%` }} /></div>}<button className="btn" type="button" onClick={uploadProfilePicture} disabled={profileUploading}>{profileUploading ? `Uploading… ${profileProgress}%` : 'Upload profile picture'}</button></div></div><div className="row"><div className="field"><label>Name</label><input value={data.profile.full_name} onChange={e => updateProfile('full_name', e.target.value)} /></div><div className="field"><label>Role</label><input value={data.profile.role} onChange={e => updateProfile('role', e.target.value)} /></div></div><div className="field"><label>Headline</label><input value={data.profile.headline} onChange={e => updateProfile('headline', e.target.value)} /></div><div className="field"><label>Bio</label><textarea value={data.profile.bio} onChange={e => updateProfile('bio', e.target.value)} /></div><div className="row"><div className="field"><label>Email</label><input value={data.profile.email} onChange={e => updateProfile('email', e.target.value)} /></div><div className="field"><label>Phone</label><input value={data.profile.phone} onChange={e => updateProfile('phone', e.target.value)} /></div></div><div className="row"><div className="field"><label>Location</label><input value={data.profile.location} onChange={e => updateProfile('location', e.target.value)} /></div><div className="field"><label>LinkedIn URL</label><input value={data.profile.linkedin_url ?? ''} onChange={e => updateProfile('linkedin_url', e.target.value)} /></div></div><div className="field"><label>GitHub URL</label><input value={data.profile.github_url ?? ''} onChange={e => updateProfile('github_url', e.target.value)} /></div></div>}
 
           {tab === 'skills' && <div className="admin-list">{data.skills.map((skill: Skill, i) => <div className="glass-card card" key={skill.id ?? i}><div className="admin-form"><div className="row"><div className="field"><label>Skill</label><input value={skill.name} onChange={e => updateRow('skills', i, { name: e.target.value })} /></div><div className="field"><label>Group</label><input value={skill.group_name} onChange={e => updateRow('skills', i, { group_name: e.target.value })} /></div></div></div></div>)}<button className="btn" onClick={() => addRow('skills')}>+ Add skill</button></div>}
 

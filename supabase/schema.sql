@@ -1,8 +1,9 @@
 create extension if not exists "pgcrypto";
 
 create table if not exists public.profiles (
-  id uuid primary key default gen_random_uuid(), full_name text not null, role text not null, headline text not null, bio text not null, location text not null, email text not null, phone text not null, resume_url text, github_url text, linkedin_url text, available_for_work boolean not null default true, updated_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(), full_name text not null, role text not null, headline text not null, bio text not null, location text not null, email text not null, phone text not null, resume_url text, github_url text, linkedin_url text, avatar_url text, available_for_work boolean not null default true, updated_at timestamptz not null default now()
 );
+alter table public.profiles add column if not exists avatar_url text;
 create table if not exists public.admins (user_id uuid primary key references auth.users(id) on delete cascade, username text, created_at timestamptz not null default now());
 alter table public.admins add column if not exists username text;
 create unique index if not exists admins_username_key on public.admins (username) where username is not null;
@@ -74,3 +75,16 @@ create policy "public can read wallpaper files" on storage.objects for select us
 create policy "admins can upload wallpaper files" on storage.objects for insert with check (bucket_id = 'wallpapers' and exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "admins can update wallpaper files" on storage.objects for update using (bucket_id = 'wallpapers' and exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "admins can delete wallpaper files" on storage.objects for delete using (bucket_id = 'wallpapers' and exists (select 1 from public.admins where user_id = auth.uid()));
+
+insert into storage.buckets (id, name, public)
+values ('profile-pictures', 'profile-pictures', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "public can read profile pictures" on storage.objects;
+drop policy if exists "admins can upload profile pictures" on storage.objects;
+drop policy if exists "admins can update profile pictures" on storage.objects;
+drop policy if exists "admins can delete profile pictures" on storage.objects;
+create policy "public can read profile pictures" on storage.objects for select using (bucket_id = 'profile-pictures');
+create policy "admins can upload profile pictures" on storage.objects for insert with check (bucket_id = 'profile-pictures' and exists (select 1 from public.admins where user_id = auth.uid()));
+create policy "admins can update profile pictures" on storage.objects for update using (bucket_id = 'profile-pictures' and exists (select 1 from public.admins where user_id = auth.uid()));
+create policy "admins can delete profile pictures" on storage.objects for delete using (bucket_id = 'profile-pictures' and exists (select 1 from public.admins where user_id = auth.uid()));
