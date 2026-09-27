@@ -16,8 +16,61 @@ create table if not exists public.tools (id uuid primary key default gen_random_
 create table if not exists public.tool_features (id uuid primary key default gen_random_uuid(), tool_id uuid not null references public.tools(id) on delete cascade, title text not null, summary text not null, details text, version text, release_date date, source_url text, sort_order integer not null default 0, created_at timestamptz not null default now());
 create table if not exists public.wallpapers (id uuid primary key default gen_random_uuid(), name text not null, storage_path text not null, public_url text not null, active boolean not null default false, sort_order integer not null default 0, created_at timestamptz not null default now());
 create table if not exists public.contact_messages (id uuid primary key default gen_random_uuid(), name text not null, email text not null, message text not null, is_read boolean not null default false, created_at timestamptz not null default now());
+create table if not exists public.job_opportunities (
+  id uuid primary key default gen_random_uuid(),
+  source text not null,
+  source_job_id text not null,
+  title text not null,
+  company text not null,
+  locations text[] not null default '{}',
+  work_mode text not null default 'unknown' check (work_mode in ('remote', 'hybrid', 'onsite', 'unknown')),
+  employment_type text,
+  description text not null default '',
+  technology_requirements text[] not null default '{}',
+  canonical_url text not null,
+  apply_url text,
+  posted_at timestamptz,
+  match_score integer not null default 0 check (match_score between 0 and 100),
+  match_reason text not null default '',
+  interview_plan jsonb not null default '{}'::jsonb,
+  status text not null default 'new' check (status in ('new', 'viewed', 'reviewed', 'saved', 'applied', 'dismissed')),
+  fetched_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (source, source_job_id)
+);
+alter table public.job_opportunities add column if not exists technology_requirements text[] not null default '{}';
+alter table public.job_opportunities drop constraint if exists job_opportunities_status_check;
+alter table public.job_opportunities add constraint job_opportunities_status_check check (status in ('new', 'viewed', 'reviewed', 'saved', 'applied', 'dismissed'));
 
-alter table public.profiles enable row level security; alter table public.admins enable row level security; alter table public.skills enable row level security; alter table public.experiences enable row level security; alter table public.projects enable row level security; alter table public.education enable row level security; alter table public.project_videos enable row level security; alter table public.tools enable row level security; alter table public.tool_features enable row level security; alter table public.wallpapers enable row level security; alter table public.contact_messages enable row level security;
+create table if not exists public.job_applications (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null unique references public.job_opportunities(id) on delete cascade,
+  recipient text not null,
+  subject text not null default '',
+  status text not null default 'applied' check (status in ('applied', 'in_progress', 'reply_received', 'selected', 'rejected', 'interview')),
+  sent_at timestamptz not null default now(),
+  last_checked_at timestamptz,
+  reply_count integer not null default 0,
+  latest_reply_at timestamptz,
+  latest_reply_from text,
+  latest_reply_subject text,
+  latest_reply_snippet text,
+  gmail_thread_id text,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.candidate_resumes (
+  id uuid primary key default gen_random_uuid(),
+  file_name text not null,
+  storage_path text not null unique,
+  mime_type text not null,
+  original_text text not null default '',
+  uploaded_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security; alter table public.admins enable row level security; alter table public.job_applications enable row level security; alter table public.candidate_resumes enable row level security; alter table public.skills enable row level security; alter table public.experiences enable row level security; alter table public.projects enable row level security; alter table public.education enable row level security; alter table public.project_videos enable row level security; alter table public.tools enable row level security; alter table public.tool_features enable row level security; alter table public.wallpapers enable row level security; alter table public.contact_messages enable row level security; alter table public.job_opportunities enable row level security;
 
 create policy "public can read profile" on public.profiles for select using (true);
 create policy "public can read skills" on public.skills for select using (true);
@@ -42,6 +95,10 @@ create policy "public can read active wallpapers" on public.wallpapers for selec
 create policy "admins manage wallpapers" on public.wallpapers for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "public can submit messages" on public.contact_messages for insert with check (true);
 create policy "admins can read themselves" on public.admins for select using (user_id = auth.uid());
+drop policy if exists "admins manage job applications" on public.job_applications;
+create policy "admins manage job applications" on public.job_applications for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
+drop policy if exists "admins manage candidate resumes" on public.candidate_resumes;
+create policy "admins manage candidate resumes" on public.candidate_resumes for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "admins manage profile" on public.profiles for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "admins manage skills" on public.skills for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "admins manage experiences" on public.experiences for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
@@ -49,6 +106,21 @@ create policy "admins manage projects" on public.projects for all using (exists 
 create policy "admins manage education" on public.education for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "admins manage messages" on public.contact_messages for select using (exists (select 1 from public.admins where user_id = auth.uid()));
 create policy "admins update messages" on public.contact_messages for update using (exists (select 1 from public.admins where user_id = auth.uid()));
+drop policy if exists "admins manage job opportunities" on public.job_opportunities;
+create policy "admins manage job opportunities" on public.job_opportunities for all using (exists (select 1 from public.admins where user_id = auth.uid())) with check (exists (select 1 from public.admins where user_id = auth.uid()));
+
+insert into storage.buckets (id, name, public)
+values ('candidate-resumes', 'candidate-resumes', false)
+on conflict (id) do update set public = false;
+
+drop policy if exists "admins can upload candidate resumes" on storage.objects;
+drop policy if exists "admins can read candidate resumes" on storage.objects;
+drop policy if exists "admins can update candidate resumes" on storage.objects;
+drop policy if exists "admins can delete candidate resumes" on storage.objects;
+create policy "admins can upload candidate resumes" on storage.objects for insert with check (bucket_id = 'candidate-resumes' and exists (select 1 from public.admins where user_id = auth.uid()));
+create policy "admins can read candidate resumes" on storage.objects for select using (bucket_id = 'candidate-resumes' and exists (select 1 from public.admins where user_id = auth.uid()));
+create policy "admins can update candidate resumes" on storage.objects for update using (bucket_id = 'candidate-resumes' and exists (select 1 from public.admins where user_id = auth.uid()));
+create policy "admins can delete candidate resumes" on storage.objects for delete using (bucket_id = 'candidate-resumes' and exists (select 1 from public.admins where user_id = auth.uid()));
 
 insert into storage.buckets (id, name, public)
 values ('project-videos', 'project-videos', true)

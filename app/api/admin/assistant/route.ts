@@ -119,7 +119,7 @@ async function applyChanges(supabase: Awaited<ReturnType<typeof requireAdmin>>['
 }
 
 function buildSystemPrompt(portfolio: unknown) {
-  return `You are the private admin copilot for a developer portfolio. The signed-in user is already authenticated as an admin. Never ask for, repeat, or store a password or API key. Answer questions from the portfolio context below. You may propose database changes only when the user clearly asks to create, update, or delete something. Always use the propose_portfolio_changes function for mutations; do not claim a change was saved before the user confirms it. Prefer small, precise changes. For updates and deletes, use the exact record id from the context. Do not invent ids. For file uploads, explain that the existing Videos or Wallpapers admin uploader is required. Portfolio context: ${JSON.stringify(portfolio)}`;
+  return `You are the private admin Assistant for a developer portfolio. The signed-in user is already authenticated as an admin. Never ask for, repeat, or store a password or API key. Answer questions from the portfolio context below. You may propose database changes only when the user clearly asks to create, update, or delete something. Always use the propose_portfolio_changes function for mutations; do not claim a change was saved before the user confirms it. Prefer small, precise changes. For updates and deletes, use the exact record id from the context. Do not invent ids. For file uploads, explain that the existing Videos or Wallpapers admin uploader is required. Portfolio context: ${JSON.stringify(portfolio)}`;
 }
 
 function geminiContents(messages: ChatMessage[]) {

@@ -52,3 +52,7 @@ Import the repository, add the three environment variables from `.env.example`, 
 
 The starter seed uses the resume details supplied in the prompt. Replace the placeholder LinkedIn and GitHub URLs in the admin profile editor before publishing. For production, add rate limiting or CAPTCHA to the public contact endpoint if it becomes a target for spam.
 # portfolio
+
+
+
+
