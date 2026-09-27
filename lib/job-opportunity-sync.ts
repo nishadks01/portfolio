@@ -14,7 +14,7 @@ export const jobSources: SourceDefinition[] = [
   { key: 'linkedin', label: 'LinkedIn', company: 'LinkedIn', url: 'https://www.linkedin.com/jobs/search/?keywords=software%20developer&location=India&geoId=&trk=public_jobs_jobs-search-bar_search-submit&position=1&pageNum=0', enabled: true },
   { key: 'naukri', label: 'Naukri.com', company: 'Naukri.com', url: 'https://www.naukri.com/software-developer-jobs', enabled: true },
   { key: 'indeed', label: 'Indeed.com', company: 'Indeed.com', url: 'https://www.indeed.com/q-Software-Developer-jobs.html', enabled: true },
-  { key: 'accenture', label: 'Accenture Careers', company: 'Accenture', url: 'https://www.accenture.com/in-en/careers/jobsearch?ct=Kochi&aoi=Software%20Engineering&et=Full-time', enabled: true },
+  { key: 'accenture', label: 'Accenture Careers', company: 'Accenture', url: 'https://www.accenture.com/in-en/careers/jobsearch?ct=Kochi&aoi=Software%20Engineering&et=Full-time&jk=react', enabled: true },
   { key: 'tcs', label: 'TCS Careers', company: 'Tata Consultancy Services', url: 'https://www.tcs.com/careers', enabled: true },
   { key: 'infosys', label: 'Infosys Careers', company: 'Infosys', url: 'https://www.infosys.com/careers.html', enabled: true },
   { key: 'wipro', label: 'Wipro Careers', company: 'Wipro', url: 'https://careers.wipro.com/', enabled: true },
